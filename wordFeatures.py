@@ -14,7 +14,7 @@ def exportData(data, path):
 
 def extractWordFeatures(description, n, contractions = True, puctuation = True, cases = True, stopWords = True, count = True):
     #fix hexcode
-    m = re.findall("(\\x\S{2}\\x\S{2}\\x\S{2})", description)
+    m = re.findall (r'[\x80-\xff][\x80-\xff][\x80-\xff]', description)
     for word in m:
         description = description.decode('utf-8')
     
@@ -26,11 +26,11 @@ def extractWordFeatures(description, n, contractions = True, puctuation = True, 
     
     #punctuation
     if puctuation == True:
-        puctuationList = ['.',',','?','!',"'",'"',':',';','-']
+        puctuationList = ['.',',','?','!',"'",'"',':',';','-'] #doesn't remove unicode punctuation
         for i in puctuationList:
             description = description.replace(i, '')
 
-    #capitalization
+            #capitalization
     if cases == True:
         description = description.lower()
     
