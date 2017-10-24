@@ -13,6 +13,11 @@ def exportData(data, path):
     data.to_csv(path)
 
 def extractWordFeatures(description, n, contractions = True, puctuation = True, cases = True, stopWords = True, count = True):
+    #fix hexcode
+    m = re.findall("(\\x\S{2}\\x\S{2}\\x\S{2})", description)
+    for word in m:
+        description = description.decode('utf-8')
+    
     #contractions
     if contractions == True:
         m = re.findall("([a-zA-Z]+'[a-zA-Z]+)", description)
