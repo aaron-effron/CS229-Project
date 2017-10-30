@@ -23,6 +23,11 @@ def makeBlobList(document, refDocumentList) :
         bloblist.append(tb(document))
     return bloblist
 
+def makeBlobListAll(documentList) :
+    for document in documentList :
+        bloblist.append(tb(document))
+    return bloblist
+
 def extractTDIFWordFeatures(document, refDocumentList, k = None) :
     bloblist = makeBlobList(document, refDocumentList)
     docLength = len(document.split())
@@ -35,33 +40,21 @@ def extractTDIFWordFeatures(document, refDocumentList, k = None) :
     sorted_words = sorted(scores.items(), key=lambda x: x[1], reverse=True)
     for word, score in sorted_words[:k]:
         print("\tWord: {}, TF-IDF: {}".format(word, round(score, k)))
-    '''
+        
+def extractTDIFWordFeatureAll(documentList, k) :
+    blobList = makeBlobListAll(documentList)
     for i, blob in enumerate(bloblist):
         print("Top words in document {}".format(i + 1))
         scores = {word: tfidf(word, blob, bloblist) for word in blob.words}
         sorted_words = sorted(scores.items(), key=lambda x: x[1], reverse=True)
         for word, score in sorted_words[:k]:
             print("\tWord: {}, TF-IDF: {}".format(word, round(score, k)))
-    '''
+   
+document1 = """Welcome to stay in private room with queen bed and detached private bathroom on the second floor."""
 
+document2 = """Stylish, fully remodeled home in upscale NW Alamo Heights Area."""
 
-
-document1 = """Welcome to stay in private room with queen bed and detached private bathroom on the second floor. 
-	Another private bedroom with sofa bed is available for additional guests. 10$ for an additional guest.\n
-	10min from IAH airport\nAirport pick-up/drop off is available for $10/trip.
-	"""
-
-document2 = """Stylish, fully remodeled home in upscale NW Alamo Heights Area. 
-	\n\nAmazing location - House conveniently located in quiet street, with beautiful seasoned trees, 
-	prestigious neighborhood and very close to the airport, 281, 410 loop and down-town area. 
-	 Driveway can park 4 cars.
-	 """
-
-#Cheap
-document3 = """
-Private Room (shared bathroom) in a warm family home. It's perfect for business trips, vacation and extended stays. 
-If you are in town as a childbirth tourist, this is also a perfect place for you.
-	"""
+document3 = """Private Room (shared bathroom) in a warm family home. It's perfect for business trips, vacation and extended stays."""
 
 def main():
     documentList = [document2, document3]
