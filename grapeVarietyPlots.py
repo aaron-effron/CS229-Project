@@ -9,12 +9,15 @@ import operator
 import numpy as np
 import math
 import sys  
-import tfidf
-
-
+import tfidf_rev
+from matplotlib import rcParams
 
 def importData(path):
     data = pd.DataFrame.from_csv(path)
+    try :
+        data = pd.read_csv(path, encoding = 'utf8')
+    except UnicodeDecodeError as e :
+        print "UGH!", e
     
     return data
     
@@ -22,13 +25,15 @@ def exportData(data, path):
     data.to_csv(path)
 
 def getDataFrame() :
-    df = importData('./winemag-data_first150k_toy.csv')
+    df = importData('./winemag-data_first150k_2.csv')
     return df
 
 def getGrapeVarietyDict(df, excludeSmall = False) :
     grapeVarietyDict = defaultdict(list)
     for index, row in df.iterrows(): 
         grapeVariety = row['variety']
+        if 'Blend' in grapeVariety.split() :
+            continue
         if grapeVariety not in grapeVarietyDict :
             grapeVarietyDict[grapeVariety].append(0)
         grapeVarietyDict[grapeVariety][0] += 1
@@ -66,11 +71,13 @@ def getGrapeVarietyByCountryDict(df, grapeVarietyDict, excludeSmall = False) :
 
 def getGrapeVarietyPriceDict(df, excludeSmall = False) :
     grapeVarietyPriceDict = defaultdict(list)
+    print "HI"
     for index, row in df.iterrows(): 
-        print row['variety']
-        grapeVariety = row['variety'].decode('utf-8')
+        grapeVariety = row['variety']
         price = row['price']
         if math.isnan(price) :
+            continue
+        if 'Blend' in grapeVariety.split() :
             continue
         grapeVarietyPriceDict[grapeVariety].append(price)
 
@@ -88,14 +95,17 @@ def getGrapeVarietyPriceDict(df, excludeSmall = False) :
         newValue.append(sum(grapeVarietyPriceDict[key])/len(grapeVarietyPriceDict[key]))
         grapeVarietyPriceDict[key] = newValue
 
-    return grapeVarietyPriceDict, 
+    return grapeVarietyPriceDict, standardDevDict
 
 def getDescriptionDict(df, excludeSmall = False) :
     descriptionDict = defaultdict(list)
     for index, row in df.iterrows(): 
         grapeVariety = row['variety']
-        print row['description']
-        description = row['description'].decode('utf-8')
+        description = row['description']
+
+        puctuationList = ['.',',','?','!',"'",'"',':',';','-'] #doesn't remove unicode punctuation
+        for i in puctuationList:
+            description = description.replace(i, '')
         descriptionDict[grapeVariety].append(description)
 
     #Prune the dictionary, so the resulting chart isn't crazy
@@ -109,28 +119,31 @@ def getDescriptionDict(df, excludeSmall = False) :
         newValue = [' '.join(descriptionDict[key])]
         descriptionDict[key] = newValue
 
-    print descriptionDict
     return descriptionDict
 
 def plotBarChart(grapeVarietyDict) :
+    rcParams.update({'figure.autolayout': True})
     df2 = pd.DataFrame(grapeVarietyDict)
     columnsList = list(df2.columns)
-    print columnsList
     valuesList = []
     for column in columnsList:
         valuesList.append(df2[column].values[0])
 
-    df = pd.DataFrame(dict(A = columnsList, B = valuesList))
-    df.set_index('A').plot.bar(rot = 90, figsize=(30, 20))
+    df = pd.DataFrame(dict(grapeVariety = columnsList, Count = valuesList))
+    df = df.sort_values(['Count'], ascending=[0]).reset_index(drop=True)
+
+    df.set_index('grapeVariety').plot.bar(rot = 90)
     plt.savefig('BarChart.png')
 
 def plotStackedBarChart(grapeVarietyByCountryDict) :
+    rcParams.update({'figure.autolayout': True})
     df3 = pd.DataFrame(grapeVarietyByCountryDict)
     colors = plt.cm.gist_rainbow(np.linspace(0, 1, 14))
-    df3.plot(kind = 'bar', stacked=True, figsize=(30,20), color=colors)
-    plt.savefig('stackedBarChart')
+    df3.plot(kind = 'bar', stacked=True, color=colors).legend(loc='upper right', fontsize=5)#, bbox_to_anchor=(1, 0.5))
+    plt.savefig('stackedBarChart.png')
 
 def plotPriceBarChart(grapeVarietyPriceDict, standardDevDict) :
+    rcParams.update({'figure.autolayout': True})
     df2 = pd.DataFrame(grapeVarietyPriceDict)
     #print df2
     columnsList = list(df2.columns)
@@ -148,50 +161,46 @@ def plotPriceBarChart(grapeVarietyPriceDict, standardDevDict) :
     stdDevValuesList = []
 
     for i in range(0, len(df.values)) :
-        print df.values[i]
         stdDevValuesList.append(df3[df.values[i][0]].values[0])
         stdDevColumnsList.append(df.values[i][0])
 
-    print stdDevValuesList
-
-    #errors = pd.DataFrame(dict(A = stdDevColumnsList, B = stdDevValuesList))
     errors = pd.DataFrame(dict(B = stdDevValuesList))
-    print errors
-    print df
 
     _, ax= plt.subplots() 
     prices = df[['B']]
-    print prices
 
-    prices.plot(kind='bar', yerr=errors, ax=ax, error_kw=dict(ecolor='black',elinewidth=0.5), grid=False, rot = 90, figsize=(30, 20))
+    prices.plot(kind='bar', yerr=errors, ax=ax, error_kw=dict(ecolor='black',elinewidth=0.5), grid=False, rot = 90)
     ax.set_xticklabels(df.A)
-    print df.A
 
     #df.set_index('A').plot(kind='bar', yerr=errors, error_kw=dict(ecolor='black',elinewidth=0.5), grid=False, rot = 90, figsize=(30, 20))
     plt.savefig('PriceBarChart.png')
-
 
 def main() :
     reload(sys)  
     sys.setdefaultencoding('utf8')
     df = getDataFrame()
-    #grapeVarietyDict = getGrapeVarietyDict(df)
-    #grapeVarietyByCountryDict = getGrapeVarietyByCountryDict(df, grapeVarietyDict)
-    #grapeVarietyPriceDict, standardDevDict = getGrapeVarietyPriceDict(df)
-    descriptionDict = getDescriptionDict(df)
-    for key in descriptionDict :
-        document1 = descriptionDict[key]
-        documentList = [descriptionDict[keya][0] for keya in descriptionDict if key != keya]
-        tfidf.extractTDIFWordFeatures(document1[0], documentList, -1)
-    #print grapeVarietyDict
-    #print grapeVarietyPriceDict
-    #plotPriceBarChart(grapeVarietyPriceDict, standardDevDict)
-   
-
-    #print grapeVarietyPriceDict
-    #plotBarChart(grapeVarietyDict)
-    #plotStackedBarChart(grapeVarietyByCountryDict)
+    for arg in sys.argv :
+        if arg == 'v' :
+            grapeVarietyDict = getGrapeVarietyDict(df, True)
+            grapeVarietyByCountryDict = getGrapeVarietyByCountryDict(df, grapeVarietyDict, True)
+            #plotBarChart(grapeVarietyDict)
+            plotStackedBarChart(grapeVarietyByCountryDict)
+        elif arg == 'p' :
+            grapeVarietyPriceDict, standardDevDict = getGrapeVarietyPriceDict(df, excludeSmall=True)
+            plotPriceBarChart(grapeVarietyPriceDict, standardDevDict)  
     
-    
+        elif arg == 'd' :
+            descriptionDict = getDescriptionDict(df, excludeSmall=True)
+            keyList = []
+            documentList = []
+            for key in descriptionDict :
+                document1 = descriptionDict[key]
+                if "Blend" in key.split() : # Don't include blends
+                    continue
+                for keya in key.split() : #break up multiple word names
+                    keyList.append(keya.lower())
+                documentList.append(descriptionDict[key][0])
+            tfidf_rev.extractTDIFWordFeatureAll(documentList, keyList, 3)
+           
 if __name__ == '__main__':
     main()
