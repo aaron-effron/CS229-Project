@@ -24,6 +24,7 @@ def makeBlobList(document, refDocumentList) :
     return bloblist
 
 def makeBlobListAll(documentList) :
+    bloblist = []
     for document in documentList :
         bloblist.append(tb(document))
     return bloblist
@@ -33,7 +34,6 @@ def extractTDIFWordFeatures(document, refDocumentList, k = None) :
     docLength = len(document.split())
     if k == None or k > docLength or k < 1 :
         k = docLength 
-
     print("Top words in document: ")
     blob = bloblist[0] #Document
     scores = {word: tfidf(word, blob, bloblist) for word in blob.words}
@@ -42,7 +42,7 @@ def extractTDIFWordFeatures(document, refDocumentList, k = None) :
         print("\tWord: {}, TF-IDF: {}".format(word, round(score, k)))
         
 def extractTDIFWordFeatureAll(documentList, k) :
-    blobList = makeBlobListAll(documentList)
+    bloblist = makeBlobListAll(documentList)
     for i, blob in enumerate(bloblist):
         print("Top words in document {}".format(i + 1))
         scores = {word: tfidf(word, blob, bloblist) for word in blob.words}
@@ -50,15 +50,15 @@ def extractTDIFWordFeatureAll(documentList, k) :
         for word, score in sorted_words[:k]:
             print("\tWord: {}, TF-IDF: {}".format(word, round(score, k)))
    
-document1 = """Welcome to stay in private room with queen bed and detached private bathroom on the second floor."""
+document1 = """welcome to stay in private room with queen bed and detached private bathroom on the second floor."""
 
-document2 = """Stylish, fully remodeled home in upscale NW Alamo Heights Area."""
+document2 = """stylish, fully remodeled home in upscale NW Alamo Heights Area."""
 
-document3 = """Private Room (shared bathroom) in a warm family home. It's perfect for business trips, vacation and extended stays."""
+document3 = """private room (shared bathroom) in a warm family home. it's perfect for business trips, vacation and extended stays."""
 
 def main():
-    documentList = [document2, document3]
-    extractTDIFWordFeatures(document1, documentList, -1)
+    documentList = [document1, document2, document3]
+    extractTDIFWordFeatureAll(documentList, 3)
 
 if __name__ == '__main__':
     main()
