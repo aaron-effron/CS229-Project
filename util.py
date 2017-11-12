@@ -22,7 +22,6 @@ CENSORED_WORDS = [] + \
     u'barbera',u'gris',u'franc',u'grosso',u'grigio',u'viognier',u'champagne',u'port',u'veltliner'] + \
     ['red','white','cab']
 CENSORED_TOKEN = '<CENSORED_WORD>'
-PUNCTUATION_LIST = ['.',',','?','!',"'",'"',':',';','-']
 STOP_WORDS = nltk_stopwords.words('english')
 
 #Only includes varieties with at least 1000 reviews, excluding blends
@@ -158,8 +157,8 @@ def extractCharFeatures(n,
     
         #Remove Punctuation
         if removePunctuation == True:
-            for i in PUNCTUATION_LIST:
-                text = text.replace(i, '')
+            regex_pat = re.compile("([\.\,\?\!\'\"\:\;\-])")
+            text = re.sub(pattern=regex_pat,repl='',string=text)
 
         #Remove Capitalization
         if lowerCase == True:
@@ -180,6 +179,9 @@ def extractCharFeatures(n,
         else:
             for i in range(len(text)-n+1):
                 result[text[i:i+n]]=1
+
+
+        print result
             
         #Return Value
         return result
@@ -248,8 +250,8 @@ def extractWordFeatures(n,
     
         #Remove Punctuation
         if removePunctuation == True:
-            for i in PUNCTUATION_LIST:
-                text = text.replace(i, '')
+            regex_pat = re.compile("([\.\,\?\!\'\"\:\;\-])")
+            text = re.sub(pattern=regex_pat,repl='',string=text)
 
         #Remove Capitalization
         if lowerCase == True:
@@ -264,18 +266,20 @@ def extractWordFeatures(n,
     
         #Get Word Counts
         word_ngrams = ngrams(words,n)
-        ngram_counts = collections.defaultdict(int)
+                
         if count == True:
-            for w in word_ngrams:
-                ngram_counts[w] +=1
+            ngram_counts = collections.Counter(word_ngrams)
+            return ngram_counts
+
         else:
+            ngram_counts = collections.defaultdict(int)
             for w in word_ngrams:
                 ngram_counts[w] =1
+            return ngram_counts
         
-        #Return Value
-        return ngram_counts
+        #Never will get here, since will return above
+        return False
 
-    n = max(1,int(n))
     return wordFeatures
 
 
