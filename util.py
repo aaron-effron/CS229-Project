@@ -13,6 +13,8 @@ from multiprocessing import Pool
 
 
 ##########################################################################################################
+# Constants | Start
+##########################################################################################################
 #Note: The first list is a place holder and the second list represents grape varieties. 
 #      Modify third list to add words
 CENSORED_WORDS = [] + \
@@ -20,51 +22,70 @@ CENSORED_WORDS = [] + \
     u'syrah',u'riesling',u'merlot',u'zinfandel',u'sangiovese',u'malbec',u'tempranillo',
     u'nebbiolo',u'portuguese',u'shiraz',u'corvina',u'rondinella',u'molinara',
     u'barbera',u'gris',u'franc',u'grosso',u'grigio',u'viognier',u'champagne',u'port',u'veltliner'] + \
-    ['red','white','cab']
+    ['red','white','cab','sb','grigios','chardonnays','chard','chablis']
 CENSORED_TOKEN = '<CENSORED_WORD>'
 STOP_WORDS = nltk_stopwords.words('english')
+REGEX_CONTRACTIONS = "([a-z]+'[a-z]+)"
+REGEX_PUNCTUATION = "([\.\,\?\!\'\"\:\;\-])"
 
+#Maps variety names to a class number (must be unique!) and a grape color
 #Only includes varieties with at least 1000 reviews, excluding blends
-COLOR_MAP = {u'Chardonnay': 'White', 
-             u'Pinot Noir': 'Red',  #champagne is listed separately so Pinot Noir should all be reds
-             u'Cabernet Sauvignon': 'Red', 
-             u'Sauvignon Blanc': 'White', 
-             u'Syrah': 'Red', 
-             u'Riesling': 'White', 
-             u'Merlot': 'Red', 
-             u'Zinfandel': 'Red', 
-             u'Sangiovese': 'Red', 
-             u'Malbec': 'Red', 
-             u'Tempranillo': 'Red',  
-             u'Nebbiolo': 'Red', 
-             u'Portuguese Red': 'Red', 
-             u'Shiraz': 'Red', 
-             u'Corvina, Rondinella, Molinara': 'Red', 
-             u'Barbera': 'Red', 
-             u'Pinot Gris': 'White',  
-             u'Cabernet Franc': 'Red', 
-             u'Sangiovese Grosso': 'Red', 
-             u'Pinot Grigio': 'White',  
-             u'Viognier': 'White', 
-             u'Champagne Blend': 'White', 
-             u'Port': 'Red', 
-             u'Veltliner' : 'White',
+VARIETY_MAP = {u'Chardonnay':             (0,'White'), 
+               u'Pinot Noir':             (1,'Red'),  #champagne is listed separately so Pinot Noir should all be reds
+               u'Cabernet Sauvignon':     (2,'Red'), 
+               u'Sauvignon Blanc':        (3,'White'), 
+               u'Syrah':                  (4,'Red'), 
+               u'Riesling':               (5,'White'), 
+               u'Merlot':                 (6,'Red'), 
+               u'Zinfandel':              (7,'Red'), 
+               u'Sangiovese':             (8,'Red'), 
+               u'Malbec':                 (9,'Red'), 
+               u'Tempranillo':            (10,'Red'),  
+               u'Nebbiolo':               (11,'Red'), 
+               u'Portuguese Red':         (12,'Red'), 
+               u'Shiraz':                 (13,'Red'), 
+               u'Corvina, Rondinella, Molinara': (14,'Red'), 
+               u'Barbera':                (15,'Red'), 
+               u'Pinot Gris':             (16,'White'),  
+               u'Cabernet Franc':         (17,'Red'), 
+               u'Sangiovese Grosso':      (18,'Red'), 
+               u'Pinot Grigio':           (19,'White'),  
+               u'Viognier':               (20,'White'), 
+               u'Champagne Blend':        (21,'White'), 
+               u'Port':                   (22,'Red'), 
+               u'Veltliner' :             (23,'White'),
             }
 #Note: renamed different Veltliner varieties in importData so no longer need the following (key,val) in COLOR_MAP:
             #'Gr\xc3\xbcner Veltliner': 'White',  #no u'...' here!!!
 
+# Invert the VARIETY_MAP. 
+# CLASS_MAP: Class Number - > Variety Name
+# Do this programatically to ensure class numbering is consistent
+CLASS_MAP = ['Error']*len(VARIETY_MAP.keys())
+for key,value in VARIETY_MAP.iteritems():
+    CLASS_MAP[value[0]] = key
+#Note: to get name of class k : CLASS_MAP[k]
+##########################################################################################################
+# Constants | End
+##########################################################################################################
+
 
 
 ##########################################################################################################
-def importData(path,getColor=False,censor=False,filter=False):
+def importData(path,censor=False,mapVariety=False,filter=False,processDescriptions=False,
+                processOptions={'removeContractions':False,'removePunctuation':True,
+                                            'removeStopWords':True, 'lowerCase':True} ):
     """
     Function to import our dataset from a CSV to a Pandas DataFrame
 
     @param path: Location of CSV file
-    @param getColor: If true, creates a 'color' column with vals ('Red','White','N/A')
-                     'N/A' means we are not considering this variety
     @param censor: If true, removes censored words
-    @param filter: If true, filters data and overrides getColor to True
+    @param mapVariety: If true, creates a 'color' column with vals ('Red','White','N/A'), where
+                       'N/A' means we are not considering this variety, and a 
+                       'class' column uniquely numbering distinct varieties (with '-1' if we ignore it)
+    @param filter: If true, filters data and overrides mapVariety to True
+    @param processDescriptions: If true, processes descriptions (e.g. remove stop words)
+    @param processOptions: Options for how to process the descritions
     """
     # Read CSV
     data = pd.read_csv(path)
@@ -86,16 +107,49 @@ def importData(path,getColor=False,censor=False,filter=False):
                 regex_string+=r'\b' + w + r'\b|'
             regex_string = regex_string[0:-1] #remove trailing pipe (|)
             regex_pat = re.compile(regex_string, flags=re.IGNORECASE)
-
-            data['description'] = data['description'].str.replace(regex_pat,CENSORED_TOKEN)
+            
+            if processDescriptions == True and processOptions['removeStopWords']==True:
+                data['description'] = data['description'].str.replace(regex_pat,'')
+            else:
+                data['description'] = data['description'].str.replace(regex_pat,CENSORED_TOKEN)
     
-    def applyColor():
-        #Create new column with wine color
-        data['color'] = data.apply(lambda row : COLOR_MAP.get(row['variety'],'N/A'), axis=1)
+    #Process the descriptions
+    if processDescriptions == True:    
+        #Remove Contractions
+        if processOptions['removeContractions'] == True:
+            regex_pat = re.compile(REGEX_CONTRACTIONS, flags=re.IGNORECASE)
+            data['description'] = data['description'].str.replace(regex_pat,'')
+    
+        #Remove Punctuation
+        if processOptions['removePunctuation'] == True:
+            regex_pat = re.compile(REGEX_PUNCTUATION)
+            data['description'] = data['description'].str.replace(regex_pat,'')
 
-    if getColor or filter:
-        applyColor()
+        #Remove Capitalization
+        if processOptions['lowerCase'] == True:
+            data['description'] = data['description'].str.lower()
 
+        #Remove Stop Words
+        if processOptions['removeStopWords'] == True:
+            if len(STOP_WORDS) > 0:
+                regex_string = ''
+                for w in STOP_WORDS:
+                    regex_string+=r'\b' + w + r'\b|'
+                regex_string = regex_string[0:-1] #remove trailing pipe (|)
+                regex_pat = re.compile(regex_string, flags=re.IGNORECASE)
+            data['description'] = data['description'].str.replace(regex_pat,'')
+        
+            #remove extra spaces created by deleting words
+            regex_string = "\s+"
+            regex_pat = re.compile(regex_string)
+            data['description'] = data['description'].str.replace(regex_pat,' ')
+    
+    #Create new columns with wine color and class number
+    if mapVariety or filter:
+        data['color'] = data.apply(lambda row : VARIETY_MAP.get(row['variety'],(-1,'N/A'))[1], axis=1)
+        data['class'] = data.apply(lambda row : VARIETY_MAP.get(row['variety'],(-1,'N/A'))[0], axis=1)
+
+    #Filter only on selected varieties
     if filter:
         data = data.loc[data['color'] != 'N/A']
         
@@ -104,22 +158,42 @@ def importData(path,getColor=False,censor=False,filter=False):
 
 #Test Cases:
 if False:
-    df = importData("../wine/winemag-data_first150k.csv",censor=True)
+    df = importData("../wine/winemag-data_first150k.csv")
+    df1 = importData("../wine/winemag-data_first150k.csv",censor=True)
     df2 = importData("../wine/winemag-data_first150k.csv",censor=True,filter=True)
-
+    df3 = importData("../wine/winemag-data_first150k.csv",censor=True,filter=True,processDescriptions=True)
+    
+    df.shape   # m = 150,930 wine reviews overall; 11 columns originally
+    df1.shape  # Same as df1 except censored words have been removed from the description column
+    df2.shape  # Reduced to m = 96,691 wine review; 13 columns overall (+color and class)
+    df3.shape  # Same as df2, except description column has been pre-processed
+    
+    set(df2['color'].values) #set(['White','Red']) as expected
+    set(df3['color'].values) #set(['White','Red']) as expected
+    set(df2['class'].values) #set([0,1,....,23]) as expected
+    set(df3['class'].values) #set([0,1,....,23]) as expected
+    
+    #track evolution of a single review
+    df['description'][14587]  #[77946]
+    df1['description'][14587]  #[77946]
+    df2['description'][14587]  #[77946]
+    df3['description'][14587]  #[77946]
+    
+    #Check Veltline mappings worked
     x = []
     vals = set(df2['variety'].values)
     len(vals)
     for v in vals:
         if v.find('Veltliner') != -1:
             x.append(v)
+    print x
 
 
 
 ##########################################################################################################
-def extractCharFeatures(n,
-        count=True,removeContractions=False,removePunctuation=True,
-        removeStopWords=True, lowerCase=True):
+def extractCharFeatures(n,count=True,
+        removedCensoredToken=False, removeContractions=False, removePunctuation=False,
+        lowerCase=False, removeStopWords=False):
     """
     Returns a function that takes as input a string |text| and returns a sparse vector (dictionary) 
     of n-gram character features.
@@ -131,14 +205,23 @@ def extractCharFeatures(n,
     Optional Args: 
         count: (bool) if true, returns the count of the n-grams
                       if false, returns an indicator for the presence of the n-grams
-        removeContractions: (bool) if true, preprocesses input text to remove contractios (i.e. apostrophes between text)
+        removedCensoredToken: (bool) if true, preprocess input to remove presence of CENSORED_TOKEN
+        removeContractions: (bool) if true, preprocesses input text to remove contractios 
+                                  (i.e. words with apostrophes between text)
         removePunctuation: (bool) if true, preprocesses input text to remove punctuation
-        removeStopWords: (bool)if true, prepocesses input text to remove stop words, as per NTLK
+        removeStopWords: (bool) if true, prepocesses input text to remove stop words, as per NTLK
         lowerCase: (bool) if true, preprocesses input to place all characters to lower case
 
     Output: 
         A function. See the output description for the function charFeatures below
-    """    
+    """
+    #Clean input errors    
+    try:
+        n = max(1,int(n)) 
+    except:
+        n = 1
+    
+    #Define the function to return
     def charFeatures(text):
         """
         Input: 
@@ -148,16 +231,19 @@ def extractCharFeatures(n,
         Example (n=3): "I like tacos" --> {'Ili': 1, 'lik': 1, 'ike': 1, . . .}
         """
         #Remove CENSORED_TOKEN
-        text = text.replace(CENSORED_TOKEN,'')
+        #Note: done separately from removeStopWords because CENSORED_TOKEN might get modified
+        #      or glued to other characters by the next steps
+        if removedCensoredToken == True:
+            text = text.replace(CENSORED_TOKEN,'')
 
         #Remove Contractions
         if removeContractions == True:
-            regex_pat = re.compile("([a-z]+'[a-z]+)", flags=re.IGNORECASE)
+            regex_pat = re.compile(REGEX_CONTRACTIONS, flags=re.IGNORECASE)
             text = re.sub(pattern=regex_pat,repl='',string=text)
     
         #Remove Punctuation
         if removePunctuation == True:
-            regex_pat = re.compile("([\.\,\?\!\'\"\:\;\-])")
+            regex_pat = re.compile(REGEX_PUNCTUATION)
             text = re.sub(pattern=regex_pat,repl='',string=text)
 
         #Remove Capitalization
@@ -179,15 +265,13 @@ def extractCharFeatures(n,
         else:
             for i in range(len(text)-n+1):
                 result[text[i:i+n]]=1
-
-
-        print result
             
         #Return Value
         return result
     
-    n = max(1,int(n))
+    #Return function
     return charFeatures
+
 
 #Test Cases
 if False:
@@ -210,9 +294,9 @@ if False:
 
 
 ##########################################################################################################
-def extractWordFeatures(n, 
-                count = True, removeContractions = False, removePunctuation = True, 
-                removeStopWords = True, lowerCase = True):
+def extractWordFeatures(n, count=True, 
+                removedCensoredToken=False, removeContractions=False, removePunctuation=False, 
+                removeStopWords=False, lowerCase=False):
     """
     Returns a function that takes as input a string |text| and returns a sparse vector (dictionary) 
     of n-gram word features.
@@ -224,6 +308,7 @@ def extractWordFeatures(n,
     Optional Args: 
         count: (bool) if true, returns the count of the n-grams
                       if false, returns an indicator for the presence of the n-grams
+        removedCensoredToken: (bool) if true, preprocess input to remove presence of CENSORED_TOKEN
         removeContractions: (bool) if true, preprocesses input text to remove contractions (i.e. apostrophes between text)
         removePunctuation: (bool) if true, preprocesses input text to remove punctuation
         removeStopWords: (bool)if true, prepocesses input text to remove stop words, as per NTLK
@@ -231,7 +316,14 @@ def extractWordFeatures(n,
 
     Output: 
         A function. See the output description for the function wordFeatures below
-    """    
+    """
+    #Clean input errors    
+    try:
+        n = max(1,int(n)) 
+    except:
+        n = 1
+ 
+    #Define the function to return
     def wordFeatures(text):
         """
         Input: 
@@ -241,16 +333,19 @@ def extractWordFeatures(n,
         Example (n=2): "I like tacos" --> {'I like': 1, 'like tacos': 1}
         """
         #Remove CENSORED_TOKEN
-        text = text.replace(CENSORED_TOKEN,'')
+        #Note: done separately from removeStopWords because CENSORED_TOKEN might get modified
+        #      or glued to other characters by the next steps
+        if removedCensoredToken == True:
+            text = text.replace(CENSORED_TOKEN,'')
 
         #Remove Contractions
         if removeContractions == True:
-            regex_pat = re.compile("([a-z]+'[a-z]+)", flags=re.IGNORECASE)
+            regex_pat = re.compile(REGEX_CONTRACTIONS, flags=re.IGNORECASE)
             text = re.sub(pattern=regex_pat,repl='',string=text)
     
         #Remove Punctuation
         if removePunctuation == True:
-            regex_pat = re.compile("([\.\,\?\!\'\"\:\;\-])")
+            regex_pat = re.compile(REGEX_PUNCTUATION)
             text = re.sub(pattern=regex_pat,repl='',string=text)
 
         #Remove Capitalization
@@ -258,28 +353,27 @@ def extractWordFeatures(n,
             text = text.lower()
 
         #Split into a word list
-        words = word_tokenize(text) #from nltk
+        words = text.split()  #before (was causing errors on unicode): word_tokenize(text) #from nltk
+                              #should be no difference if feeding in preprocessed text
 
         #Remove Stop Words
         if removeStopWords == True:
             words = [w for w in words if w not in STOP_WORDS]
     
         #Get Word Counts
-        word_ngrams = ngrams(words,n)
-                
+        word_ngrams = ngrams(words,n)        
         if count == True:
             ngram_counts = collections.Counter(word_ngrams)
-            return ngram_counts
-
+            
         else:
             ngram_counts = collections.defaultdict(int)
             for w in word_ngrams:
                 ngram_counts[w] =1
-            return ngram_counts
         
-        #Never will get here, since will return above
-        return False
-
+        #Return value
+        return ngram_counts
+    
+    #Return function
     return wordFeatures
 
 
@@ -320,6 +414,7 @@ def featureExtractor(individualExtractors):
             extractorName = extractor.func_name
             for key, value in extractor(x).items():
                 #append name because there may be identical keys for different extractors
+                #note: may still be collision if same extractor used more than once
                 features[(extractorName,key)] = value
         return features
     return extract
