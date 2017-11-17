@@ -95,8 +95,34 @@ print("Score with pystruct subgradient ssvm: %f (took %f seconds)"
 
 # the standard one-vs-rest multi-class would probably be as good and faster
 # but solving a different model
+
+Train Score with sklearn and libsvm: 0.935657 (took 2.000000 seconds)
+Dev Score with sklearn and libsvm: 0.655067
 '''
+
+
 libsvm = LinearSVC(multi_class='crammer_singer', C=.1)
 libsvm.fit(X_train_bias, y_train)
-print("Score with sklearn and libsvm: %f (took %f seconds)"
-      % (libsvm.score(X_dev_bias, y_dev), 2))
+print("Train Score with sklearn and libsvm: %f"
+      % (libsvm.score(X_train_bias, y_train)))
+print("Dev Score with sklearn and libsvm: %f"
+      % (libsvm.score(X_dev_bias, y_dev)))
+'''
+
+#Binary
+
+Train Score with sklearn and libsvm: 0.997086
+Dev Score with sklearn and libsvm: 0.976800
+
+
+y_train_bin = (1*(data['color'][:num_train] == 'Red')).as_matrix()
+y_dev_bin   = (1*(data['color'][num_train:] == 'Red')).as_matrix()
+
+libsvm = LinearSVC(multi_class='crammer_singer', C=.1)
+libsvm.fit(X_train_bias, y_train_bin)
+print("Train Score with sklearn and libsvm: %f"
+      % (libsvm.score(X_train_bias, y_train_bin)))
+print("Dev Score with sklearn and libsvm: %f"
+      % (libsvm.score(X_dev_bias, y_dev_bin)))
+
+'''
