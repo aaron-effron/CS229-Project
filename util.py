@@ -22,7 +22,7 @@ CENSORED_WORDS = [] + \
     u'syrah',u'riesling',u'merlot',u'zinfandel',u'sangiovese',u'malbec',u'tempranillo',
     u'nebbiolo',u'portuguese',u'shiraz',u'corvina',u'rondinella',u'molinara',
     u'barbera',u'gris',u'franc',u'grosso',u'grigio',u'viognier',u'champagne',u'port',u'veltliner'] + \
-    ['red','white','cab','sb','grigios','chardonnays','chard','chablis']
+    ['red','white','cab','sb','grigios','chardonnays','chard','chablis','chards']
 CENSORED_TOKEN = '<CENSORED_WORD>'
 STOP_WORDS = nltk_stopwords.words('english')
 REGEX_CONTRACTIONS = "([a-z]+'[a-z]+)"
@@ -85,7 +85,7 @@ def importData(path,censor=False,mapVariety=False,filter=False,processDescriptio
                        'class' column uniquely numbering distinct varieties (with '-1' if we ignore it)
     @param filter: If true, filters data and overrides mapVariety to True
     @param processDescriptions: If true, processes descriptions (e.g. remove stop words)
-    @param processOptions: Options for how to process the descritions
+    @param processOptions: Options for how to process the descritions (when processDescriptions is true)
     """
     # Read CSV
     data = pd.read_csv(path)
@@ -137,15 +137,16 @@ def importData(path,censor=False,mapVariety=False,filter=False,processDescriptio
                     regex_string+=r'\b' + w + r'\b|'
                 regex_string = regex_string[0:-1] #remove trailing pipe (|)
                 regex_pat = re.compile(regex_string, flags=re.IGNORECASE)
-            data['description'] = data['description'].str.replace(regex_pat,'')
+                data['description'] = data['description'].str.replace(regex_pat,'')
         
-            #remove extra spaces created by deleting words
-            regex_string = "\s+"
-            regex_pat = re.compile(regex_string)
-            data['description'] = data['description'].str.replace(regex_pat,' ')
+                #remove extra spaces created by deleting words
+                regex_string = "\s+"
+                regex_pat = re.compile(regex_string)
+                data['description'] = data['description'].str.replace(regex_pat,' ')
     
     #Create new columns with wine color and class number
-    if mapVariety or filter:
+    mapVariety = filter if filter == True else mapVariety #filter overrides mapVariety because we need the color field to filter data
+    if mapVariety:
         data['color'] = data.apply(lambda row : VARIETY_MAP.get(row['variety'],(-1,'N/A'))[1], axis=1)
         data['class'] = data.apply(lambda row : VARIETY_MAP.get(row['variety'],(-1,'N/A'))[0], axis=1)
 
@@ -206,7 +207,7 @@ def extractCharFeatures(n,count=True,
         count: (bool) if true, returns the count of the n-grams
                       if false, returns an indicator for the presence of the n-grams
         removedCensoredToken: (bool) if true, preprocess input to remove presence of CENSORED_TOKEN
-        removeContractions: (bool) if true, preprocesses input text to remove contractios 
+        removeContractions: (bool) if true, preprocesses input text to remove contractions 
                                   (i.e. words with apostrophes between text)
         removePunctuation: (bool) if true, preprocesses input text to remove punctuation
         removeStopWords: (bool) if true, prepocesses input text to remove stop words, as per NTLK
@@ -267,7 +268,7 @@ def extractCharFeatures(n,count=True,
                 result[text[i:i+n]]=1
             
         #Return Value
-        return result
+        return dict(result) #convert back to regular dict type
     
     #Return function
     return charFeatures
@@ -361,7 +362,9 @@ def extractWordFeatures(n, count=True,
             words = [w for w in words if w not in STOP_WORDS]
     
         #Get Word Counts
-        word_ngrams = ngrams(words,n)        
+        word_ngrams = ngrams(words,n)   
+        ngram_counts = None #initialize object name
+   
         if count == True:
             ngram_counts = collections.Counter(word_ngrams)
             
@@ -371,7 +374,7 @@ def extractWordFeatures(n, count=True,
                 ngram_counts[w] =1
         
         #Return value
-        return ngram_counts
+        return dict(ngram_counts) #convert back to regular dict type
     
     #Return function
     return wordFeatures
