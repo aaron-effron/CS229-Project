@@ -32,8 +32,10 @@ def getGrapeVarietyDict(df, excludeSmall = False) :
     grapeVarietyDict = defaultdict(list)
     for index, row in df.iterrows(): 
         grapeVariety = row['variety']
+        '''
         if 'Blend' in grapeVariety.split() :
             continue
+        '''
         if grapeVariety not in grapeVarietyDict :
             grapeVarietyDict[grapeVariety].append(0)
         grapeVarietyDict[grapeVariety][0] += 1
@@ -182,9 +184,9 @@ def main() :
     for arg in sys.argv :
         if arg == 'v' :
             grapeVarietyDict = getGrapeVarietyDict(df, True)
-            grapeVarietyByCountryDict = getGrapeVarietyByCountryDict(df, grapeVarietyDict, True)
-            #plotBarChart(grapeVarietyDict)
-            plotStackedBarChart(grapeVarietyByCountryDict)
+            #grapeVarietyByCountryDict = getGrapeVarietyByCountryDict(df, grapeVarietyDict, True)
+            plotBarChart(grapeVarietyDict)
+            #plotStackedBarChart(grapeVarietyByCountryDict)
         elif arg == 'p' :
             grapeVarietyPriceDict, standardDevDict = getGrapeVarietyPriceDict(df, excludeSmall=True)
             plotPriceBarChart(grapeVarietyPriceDict, standardDevDict)  

@@ -25,8 +25,10 @@ df = importData("winemag-data_first150k.csv",censor=True,filter=True,processDesc
 
 # Settings
 num_examples = 25000
+#num_examples = 50000
 perc_train   = 0.70
-featurizer   = extractWordFeatures(1)
+#featurizer   = extractWordFeatures(1)
+featurizer   = extractCharFeatures(5)
   #Other options: genericExtractor  extractWordFeatures(1)  extractCharFeatures(5)
   #               featureExtractor([extractWordFeatures(1),extractWordFeatures(2)])
 
@@ -98,7 +100,6 @@ print("Score with pystruct subgradient ssvm: %f (took %f seconds)"
 
 Train Score with sklearn and libsvm: 0.935657 (took 2.000000 seconds)
 Dev Score with sklearn and libsvm: 0.655067
-'''
 
 
 libsvm = LinearSVC(multi_class='crammer_singer', C=.1)
@@ -107,13 +108,20 @@ print("Train Score with sklearn and libsvm: %f"
       % (libsvm.score(X_train_bias, y_train)))
 print("Dev Score with sklearn and libsvm: %f"
       % (libsvm.score(X_dev_bias, y_dev)))
-'''
+
+coef = libsvm.coef_[0,:] #only gets the theta vector for first class in multiclass prediction
+                        #use indiced other than 0 to get theta vector for other classes
+
+weights = pd.DataFrame({'feature': feature_names,'coef': coef})
+weights.sort_values(by='coef',inplace=True,ascending=False)
+outputWeights('weights.txt',weights,featureWidth=50)
+
 
 #Binary
 
 Train Score with sklearn and libsvm: 0.997086
 Dev Score with sklearn and libsvm: 0.976800
-
+'''
 
 y_train_bin = (1*(data['color'][:num_train] == 'Red')).as_matrix()
 y_dev_bin   = (1*(data['color'][num_train:] == 'Red')).as_matrix()
@@ -125,4 +133,3 @@ print("Train Score with sklearn and libsvm: %f"
 print("Dev Score with sklearn and libsvm: %f"
       % (libsvm.score(X_dev_bias, y_dev_bin)))
 
-'''
