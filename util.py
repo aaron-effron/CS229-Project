@@ -10,6 +10,7 @@ from nltk.corpus import stopwords as nltk_stopwords
 import scipy.sparse as sp
 from sklearn.feature_extraction import DictVectorizer
 from multiprocessing import Pool
+from gensim.models import Word2Vec
 
 
 ##########################################################################################################
@@ -104,15 +105,19 @@ def importData(path,censor=False,mapVariety=False,filter=False,processDescriptio
         if len(CENSORED_WORDS) > 0:
             regex_string = ''
             for w in CENSORED_WORDS:
-                regex_string+=r'\b' + w + r'\b|'
+                #regex_string+=r'\b' + w + r'*\b|'
+                regex_string+=r'\b[\S|\X]*' + w + r'[\S|\X]* \b|'
             regex_string = regex_string[0:-1] #remove trailing pipe (|)
-            regex_pat = re.compile(regex_string, flags=re.IGNORECASE)
+            regex_pat = re.compile(regex_string, flags=(re.IGNORECASE | re.UNICODE))
+
+            print "Data description was", data['description'].as_matrix()
             
             if processDescriptions == True and processOptions['removeStopWords']==True:
                 data['description'] = data['description'].str.replace(regex_pat,'')
             else:
                 data['description'] = data['description'].str.replace(regex_pat,CENSORED_TOKEN)
     
+    print "Data description is now", data['description'].as_matrix()
     #Process the descriptions
     if processDescriptions == True:    
         #Remove Contractions
@@ -377,6 +382,9 @@ def extractWordFeatures(n, count=True,
         return dict(ngram_counts) #convert back to regular dict type
     
     #Return function
+
+    print "Word features time"
+    print wordFeatures
     return wordFeatures
 
 
@@ -437,7 +445,7 @@ if False:
 
 
 ##########################################################################################################
-def DesignMatrix(data,featurizer,num_train):
+def DesignMatrix(data,dataWV,featurizer,num_train, wordVec = None):
     """
     Takes as input a list (or 1-D array) of model input values x^(i) to which to apply a featurizer, phi()
     Produces train/dev sparse matrices which can be used for modelling    
@@ -463,19 +471,48 @@ def DesignMatrix(data,featurizer,num_train):
     #feature_list = list(Pool().map(featurizer_wrapper,data))
     #----------------------------------------------------------------#
 
-    feature_list = list(map(featurizer,data))
+    wordVec = True
+    feature_list = []
+    if wordVec :
+        sentences = [el.split() for el in dataWV]
+        min_count = 1 #Unclear what this needs to be to encapsulate everything?
+        size = 200 #Gives you dimensionality of vector
+        window = 5
+        model = Word2Vec(sentences, min_count=min_count, size=size, window=window)
+        #feature_list = []
+
+        for ell in data :
+            outputVector = [0 for i in range(0, size)]
+            for word in ell.split() :
+                if '\x89\xdb\xcf\x89\xdb\x9d' in word :
+                    print "WORD IS: ", word
+                    print "ell is: ", ell
+                outputVector = [x + y for x, y in zip(outputVector, model[word])]
+            feature_list.append(outputVector)
+    
+    #feature_list = list(map(featurizer,data))
+    train_feature_mat_sparse = sp.csr_matrix(feature_list[:num_train])
+    dev_feature_mat_sparse = sp.csr_matrix(feature_list[num_train:])
+    feature_names = ['blah', 'blah']
+
+    #print feature_list[0]
+    #print "Feature list: ", feature_list
     assert num_train > 0 and num_train < len(feature_list)
 
     vectorizer = DictVectorizer() 
-    train_feature_mat_dense = vectorizer.fit_transform(feature_list[:num_train]).toarray()
-    dev_feature_mat_dense   = vectorizer.transform(feature_list[num_train:]).toarray()
+    #train_feature_mat_dense = vectorizer.fit_transform(feature_list[:num_train]).toarray()
+    #dev_feature_mat_dense   = vectorizer.transform(feature_list[num_train:]).toarray()
+
+    #print train_feature_mat_dense[0]
+    #print "Train feature matrix dense is: ", train_feature_mat_dense
+
     #doc: -http://scikit-learn.org/stable/modules/generated/sklearn.feature_extraction.DictVectorizer.html-
         #transform(): Named features not encountered during fit or fit_transform will be silently ignored.
 
-    train_feature_mat_sparse = sp.csr_matrix(train_feature_mat_dense)
-    dev_feature_mat_sparse   = sp.csr_matrix(dev_feature_mat_dense)
+    #train_feature_mat_sparse = sp.csr_matrix(train_feature_mat_dense)
+    #dev_feature_mat_sparse   = sp.csr_matrix(dev_feature_mat_dense)
 
-    feature_names = list(map(str,vectorizer.get_feature_names()))
+    #feature_names = list(map(str,vectorizer.get_feature_names()))
     
     return train_feature_mat_sparse,dev_feature_mat_sparse,feature_names
 

@@ -4,9 +4,13 @@ from sklearn.linear_model import LogisticRegression
 import operator
 
 #Import Data
-df = importData("../wine/winemag-data_first150k.csv",censor=True,filter=True,processDescriptions=True) 
+#df = importData("winemag-data_first150k.csv",censor=True,filter=True,processDescriptions=True) 
+df = importData("winemag-data_first150k_test.csv",censor=True,filter=True,processDescriptions=True) 
      #be patient. It takes about 50 seconds
 
+exit()
+dfWV = importData("winemag-data_first150k.csv", filter=True, processDescriptions=True)#, processOptions={'removeContractions':False,'removePunctuation':True,
+                                            #'removeStopWords':True, 'lowerCase':True}) 
 
 # Settings
 num_examples = 25000
@@ -17,14 +21,18 @@ featurizer   = extractWordFeatures(1)
 
 # Subset Data
 data = df.iloc[0:num_examples,:]
+dataWV = dfWV.iloc[0:num_examples,:]
+
 num_train = int(num_examples*perc_train)
 
 # Get Design Matrix and Feature List (using time for debugging)
 import time
 start = time.time()
-X_train, X_dev, feature_names = DesignMatrix(data=data['description'].as_matrix(),
+X_train, X_dev, feature_names = DesignMatrix(data=data['description'].as_matrix(), dataWV=dataWV['description'].as_matrix(),
                                         featurizer=featurizer,
                                         num_train=num_train)
+
+exit()
 print(time.time() - start)
 #Run-time for 5000 examples
 #   genericExtrtactor: 0.062s
@@ -66,6 +74,8 @@ coef = model.coef_[0,:] #only gets the theta vector for first class in multiclas
 pred = model.predict(X_dev)
 
 # Weight Analysis
+'''
 weights = pd.DataFrame({'feature': feature_names,'coef': coef})
 weights.sort_values(by='coef',inplace=True,ascending=False)
 outputWeights('weights.txt',weights,featureWidth=50)
+'''

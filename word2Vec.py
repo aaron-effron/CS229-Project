@@ -10,7 +10,7 @@ import random
 
 from gensim.models import Word2Vec
 min_count = 1 #Unclear what this needs to be to encapsulate everything?
-size = 50 #Gives you dimensionality of vector
+size = 2000 #Gives you dimensionality of vector
 window = 4
  
 
@@ -27,11 +27,22 @@ sentences = finalStringList
 model = Word2Vec(sentences, min_count=min_count, size=size, window=window)
 
 #print sentences
+print len(string1.split()) + len(string2.split()) + len(string3.split())
 print model.wv.vocab.keys()
-print model.wv.vocab['and']
-print '\n\n'
-print model['a']
-print model['tremendous']
+
+outputVector = [0 for i in range(0, size)]
+outputVector2 = [0 for i in range(0, size)]
+
+for word in string1.split() :
+  outputVector = [x + y for x, y in zip(outputVector, model[word])]
+print outputVector
+
+for word in string2.split() :
+  outputVector2 = [x + y for x, y in zip(outputVector2, model[word])]
+print outputVector2
+
+#print model['a']
+#print model['tremendous']
 #print vocab[:10]
 
 
