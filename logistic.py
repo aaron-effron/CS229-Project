@@ -4,13 +4,14 @@ from sklearn.linear_model import LogisticRegression
 import operator
 
 #Import Data
-#df = importData("winemag-data_first150k.csv",censor=True,filter=True,processDescriptions=True) 
-df = importData("winemag-data_first150k_test.csv",censor=True,filter=True,processDescriptions=True) 
+df = importData("winemag-data_first150k.csv",censor=True,filter=True,processDescriptions=True) 
+#df = importData("winemag-data_first150k_test.csv",censor=True,filter=True,processDescriptions=True) 
      #be patient. It takes about 50 seconds
 
-exit()
-dfWV = importData("winemag-data_first150k.csv", filter=True, processDescriptions=True)#, processOptions={'removeContractions':False,'removePunctuation':True,
-                                            #'removeStopWords':True, 'lowerCase':True}) 
+#dfWV = importData("winemag-data_first150k.csv", filter=True, processDescriptions=True, processOptions={'removeContractions':False,'removePunctuation':True,
+
+dfWV = importData("winemag-data_first150k.csv", filter=True, processDescriptions=True, processOptions={'removeContractions':False,'removePunctuation':True,
+                                            'removeStopWords':False, 'lowerCase':True}) 
 
 # Settings
 num_examples = 25000
@@ -32,7 +33,6 @@ X_train, X_dev, feature_names = DesignMatrix(data=data['description'].as_matrix(
                                         featurizer=featurizer,
                                         num_train=num_train)
 
-exit()
 print(time.time() - start)
 #Run-time for 5000 examples
 #   genericExtrtactor: 0.062s

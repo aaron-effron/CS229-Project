@@ -12,7 +12,6 @@ from sklearn.feature_extraction import DictVectorizer
 from multiprocessing import Pool
 from gensim.models import Word2Vec
 
-
 ##########################################################################################################
 # Constants | Start
 ##########################################################################################################
@@ -100,35 +99,59 @@ def importData(path,censor=False,mapVariety=False,filter=False,processDescriptio
     data['variety'] = data.apply(lambda row : 'Veltliner' \
                             if row['variety'].find('Veltliner')>=0 else row['variety'], axis=1)
     
+     #Extra, may not help (to remove all unicode)
+    regex_string = r'[\x9d-\xff]'
+    regex_pat = re.compile(regex_string)
+    data['description'] = data['description'].str.replace(regex_pat,' ')
+
+    regex_string = "\s+"
+    regex_pat = re.compile(regex_string)
+    data['description'] = data['description'].str.replace(regex_pat,' ')
+    #End extra
+
+    #print "Description was", data['description'].as_matrix()
     # Censor words from list of fixed words
     if censor:
+        print "We're censoring"
         if len(CENSORED_WORDS) > 0:
             regex_string = ''
+            #regex_string += r'[^\x00-\x7F]|'
             for w in CENSORED_WORDS:
                 #regex_string+=r'\b' + w + r'*\b|'
-                regex_string+=r'\b[\S|\X]*' + w + r'[\S|\X]* \b|'
+                #regex_string+=r'\b[\S|\X]*' + w + r'[\S|\X]*\b|'
+                #regex_string+=r'\b[\S|\X|\\]*' + w + r'[\S|\X]* ?\b|'
+                #regex_string+=r'\b ?[\S|\X|\\]*' + w + r'[\S|\X]* ?\b|'
+                regex_string+= r'\b[\S]*' + w + r'[\S]*\b|'
+
+            #Hack, trying to figure out how to not have to do this.
+            #regex_string += r'\x9d|'
+
             regex_string = regex_string[0:-1] #remove trailing pipe (|)
             regex_pat = re.compile(regex_string, flags=(re.IGNORECASE | re.UNICODE))
+            #re.match(regex_pat, data['description'].as_matrix()[0])
+            #result = data['description'].as_matrix()[0].match(regex_pat)
+            #print "RESULT IS", result
 
-            print "Data description was", data['description'].as_matrix()
-            
             if processDescriptions == True and processOptions['removeStopWords']==True:
-                data['description'] = data['description'].str.replace(regex_pat,'')
+                #data['description'].as_matrix()[3] = regex_pat.sub(' ', data['description'].as_matrix()[3])# , data['description'].as_matrix()[3])
+                data['description'] = data['description'].str.replace(regex_pat,' ')
             else:
                 data['description'] = data['description'].str.replace(regex_pat,CENSORED_TOKEN)
-    
-    print "Data description is now", data['description'].as_matrix()
+
     #Process the descriptions
+    #print "Description after censor", data['description'].as_matrix()[0]
     if processDescriptions == True:    
         #Remove Contractions
         if processOptions['removeContractions'] == True:
             regex_pat = re.compile(REGEX_CONTRACTIONS, flags=re.IGNORECASE)
             data['description'] = data['description'].str.replace(regex_pat,'')
     
+
         #Remove Punctuation
         if processOptions['removePunctuation'] == True:
             regex_pat = re.compile(REGEX_PUNCTUATION)
             data['description'] = data['description'].str.replace(regex_pat,'')
+
 
         #Remove Capitalization
         if processOptions['lowerCase'] == True:
@@ -139,15 +162,15 @@ def importData(path,censor=False,mapVariety=False,filter=False,processDescriptio
             if len(STOP_WORDS) > 0:
                 regex_string = ''
                 for w in STOP_WORDS:
-                    regex_string+=r'\b' + w + r'\b|'
+                    regex_string+= r'\b[\X]*' + w + r'[\X]*\b|'
                 regex_string = regex_string[0:-1] #remove trailing pipe (|)
                 regex_pat = re.compile(regex_string, flags=re.IGNORECASE)
                 data['description'] = data['description'].str.replace(regex_pat,'')
-        
                 #remove extra spaces created by deleting words
                 regex_string = "\s+"
                 regex_pat = re.compile(regex_string)
                 data['description'] = data['description'].str.replace(regex_pat,' ')
+
     
     #Create new columns with wine color and class number
     mapVariety = filter if filter == True else mapVariety #filter overrides mapVariety because we need the color field to filter data
@@ -158,7 +181,7 @@ def importData(path,censor=False,mapVariety=False,filter=False,processDescriptio
     #Filter only on selected varieties
     if filter:
         data = data.loc[data['color'] != 'N/A']
-        
+
     return data
 
 
@@ -383,8 +406,6 @@ def extractWordFeatures(n, count=True,
     
     #Return function
 
-    print "Word features time"
-    print wordFeatures
     return wordFeatures
 
 
@@ -476,7 +497,7 @@ def DesignMatrix(data,dataWV,featurizer,num_train, wordVec = None):
     if wordVec :
         sentences = [el.split() for el in dataWV]
         min_count = 1 #Unclear what this needs to be to encapsulate everything?
-        size = 200 #Gives you dimensionality of vector
+        size = 10 #Gives you dimensionality of vector
         window = 5
         model = Word2Vec(sentences, min_count=min_count, size=size, window=window)
         #feature_list = []
@@ -484,10 +505,11 @@ def DesignMatrix(data,dataWV,featurizer,num_train, wordVec = None):
         for ell in data :
             outputVector = [0 for i in range(0, size)]
             for word in ell.split() :
-                if '\x89\xdb\xcf\x89\xdb\x9d' in word :
-                    print "WORD IS: ", word
-                    print "ell is: ", ell
-                outputVector = [x + y for x, y in zip(outputVector, model[word])]
+                if word in model.wv.vocab.keys() :
+                    outputVector = [x + y for x, y in zip(outputVector, model[word])]
+                else :
+                    print "Word: ", word, " not in dictionary"
+                    print "Sentence is: ", ell
             feature_list.append(outputVector)
     
     #feature_list = list(map(featurizer,data))
