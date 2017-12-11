@@ -497,11 +497,15 @@ def DesignMatrix(data,dataWV,featurizer,num_train, wordVec = None):
     if wordVec :
         sentences = [el.split() for el in dataWV]
         min_count = 1 #Unclear what this needs to be to encapsulate everything?
-        size = 10 #Gives you dimensionality of vector
+        size = 200 #Gives you dimensionality of vector
         window = 5
         model = Word2Vec(sentences, min_count=min_count, size=size, window=window)
         #feature_list = []
 
+        #Want Euclidean distance between all output vectors, and see which examples have minimum
+        #distance to each other, with the whole summation stuff.  So you're not even using 
+        #print "STUFFFFF: ", model.similarity('tremendous', 'tannins')
+        
         for ell in data :
             outputVector = [0 for i in range(0, size)]
             for word in ell.split() :
@@ -510,8 +514,30 @@ def DesignMatrix(data,dataWV,featurizer,num_train, wordVec = None):
                 else :
                     print "Word: ", word, " not in dictionary"
                     print "Sentence is: ", ell
-            feature_list.append(outputVector)
+            feature_list.append((ell, np.array(outputVector)))
+
+        minDistance = float('Inf')
+        lenFeatList = len(feature_list)
+
+        for i in range(0, len(feature_list)) :
+            for j in range(i + 1, len(feature_list)) :
+                vec1 = feature_list[i]
+                vec2 = feature_list[j]
+                dist = np.linalg.norm(vec1[1] - vec2[1])
+                if dist > 0 and dist < minDistance : #Don't let it be to itself
+                    print "Min distance is now: {}".format(dist)
+                    print "vec1 is {}".format(vec1[0])
+                    print "vec2 is {}".format(vec2[0])
+                    minDistance = dist
+                    sentence1 = vec1[0]
+                    sentence2 = vec2[0]
+            #feature_list.append(outputVector)
     
+    print "Min distance was {}".format(minDistance)
+    print "Sentence 1 was {}".format(sentence1)
+    print "Sentence 2 was {}".format(sentence2)
+
+
     #feature_list = list(map(featurizer,data))
     train_feature_mat_sparse = sp.csr_matrix(feature_list[:num_train])
     dev_feature_mat_sparse = sp.csr_matrix(feature_list[num_train:])
