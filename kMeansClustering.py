@@ -30,11 +30,6 @@ X_train, X_dev, feature_names = DesignMatrix(data=data['description'].as_matrix(
                                         featurizer=featurizer,
                                         num_train=num_train)
 
-"""
-#this chunk of code does PCA
-
-"""
-
 #stuff for determining cluster composition
 colors = ['White', 'Red']
 colorList = np.copy(data['color'])

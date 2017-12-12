@@ -36,3 +36,5 @@ print(time.time() - start)
 svd = TruncatedSVD(n_components=5, n_iter=7, random_state=42)
 svd.fit(X_train.T) #this reduces the number of words not the number of examples
 X_train_reduced = svd.components_.T #use this to plug back into your model of choice
+
+print svd.explained_variance_ratio_
