@@ -105,7 +105,6 @@ def importData(path,removeSpecialChars=False,censor=False,mapVariety=False,filte
     #Remove Special Characters
     if removeSpecialChars:
         regex_string = r'[\x80-\xff]'
-        #regex_string = r'[\x9d-\xff]'
         regex_pat = re.compile(regex_string)
         data['description'] = data['description'].str.replace(regex_pat,' ')
 
@@ -118,7 +117,6 @@ def importData(path,removeSpecialChars=False,censor=False,mapVariety=False,filte
         if len(CENSORED_WORDS) > 0:
             regex_string = ''
             for w in CENSORED_WORDS:
-                #regex_string+=r'\b' + w + r'\b|'
                 regex_string+= r'\b[\S]*' + w + r'[\S]*\b|'
             regex_string = regex_string[0:-1] #remove trailing pipe (|)
             regex_pat = re.compile(regex_string, flags=re.IGNORECASE)

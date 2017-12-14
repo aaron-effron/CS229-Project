@@ -63,10 +63,8 @@ if False:
     C = [100000,10000,1000,500,100,50,10,5,3,2,1,0.75,0.5,0.1,0.01] #larger values -> less regularization -> more complex model
     regularizationData = []
     for c in C:
-        #model = LogisticRegression(penalty='l2',class_weight=class_weight)
         model = LogisticRegression(penalty='l2',C=c,class_weight=class_weight,multi_class='multinomial',solver='sag')
         model = model.fit(X_train,y_train)
-        #pred = model.predict(X_dev)
         regularizationData.append([np.log10(c),model.score(X_train,y_train),model.score(X_dev,y_dev)])
     regularizationData_np = np.array(regularizationData)
 

@@ -86,8 +86,6 @@ df = importData("data-raw/winemag-data_first150k.csv",filter=True)
 #Settings
 sample_index = 95130 #95130 92115
 topK = 5
-#temp = (I == 126156)*1
-#max([(val,i) for i,val in enumerate(temp)])
 
 #Calculate Cosine Similarity
 sample = X[sample_index,:]
