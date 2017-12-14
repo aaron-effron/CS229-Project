@@ -9,8 +9,10 @@ from nltk.util import ngrams
 from nltk.corpus import stopwords as nltk_stopwords
 import scipy.sparse as sp
 from sklearn.feature_extraction import DictVectorizer
-from multiprocessing import Pool
+import itertools
 from gensim.models import Word2Vec
+from gensim.parsing import PorterStemmer
+
 
 ##########################################################################################################
 # Constants | Start
@@ -22,7 +24,8 @@ CENSORED_WORDS = [] + \
     u'syrah',u'riesling',u'merlot',u'zinfandel',u'sangiovese',u'malbec',u'tempranillo',
     u'nebbiolo',u'portuguese',u'shiraz',u'corvina',u'rondinella',u'molinara',
     u'barbera',u'gris',u'franc',u'grosso',u'grigio',u'viognier',u'champagne',u'port',u'veltliner'] + \
-    ['red','white','cab','sb','grigios','chardonnays','chard','chablis','chards']
+    ['red','white','cab','sb','grigios','chardonnays','chard','chablis','chards','zin','sauv',
+    'cabernets','amarone','bordeaux','verdot','burgandy','burgundian','rioja','sancerre']
 CENSORED_TOKEN = '<CENSORED_WORD>'
 STOP_WORDS = nltk_stopwords.words('english')
 REGEX_CONTRACTIONS = "([a-z]+'[a-z]+)"
@@ -62,7 +65,7 @@ VARIETY_MAP = {u'Chardonnay':             (0,'White'),
 # CLASS_MAP: Class Number - > Variety Name
 # Do this programatically to ensure class numbering is consistent
 CLASS_MAP = ['Error']*len(VARIETY_MAP.keys())
-for key,value in VARIETY_MAP.iteritems():
+for key,value in VARIETY_MAP.items():
     CLASS_MAP[value[0]] = key
 #Note: to get name of class k : CLASS_MAP[k]
 ##########################################################################################################
@@ -72,7 +75,7 @@ for key,value in VARIETY_MAP.iteritems():
 
 
 ##########################################################################################################
-def importData(path,censor=False,mapVariety=False,filter=False,processDescriptions=False,
+def importData(path,removeSpecialChars=False,censor=False,mapVariety=False,filter=False,processDescriptions=False,
                 processOptions={'removeContractions':False,'removePunctuation':True,
                                             'removeStopWords':True, 'lowerCase':True} ):
     """
@@ -99,48 +102,32 @@ def importData(path,censor=False,mapVariety=False,filter=False,processDescriptio
     data['variety'] = data.apply(lambda row : 'Veltliner' \
                             if row['variety'].find('Veltliner')>=0 else row['variety'], axis=1)
     
-     #Extra, may not help (to remove all unicode)
-    
-    regex_string = r'[\x89-\xff]'
-    #regex_string = r'[\x9d-\xff]'
-    regex_pat = re.compile(regex_string)
-    data['description'] = data['description'].str.replace(regex_pat,' ')
+    #Remove Special Characters
+    if removeSpecialChars:
+        regex_string = r'[\x80-\xff]'
+        #regex_string = r'[\x9d-\xff]'
+        regex_pat = re.compile(regex_string)
+        data['description'] = data['description'].str.replace(regex_pat,' ')
 
-    regex_string = "\s+"
-    regex_pat = re.compile(regex_string)
-    data['description'] = data['description'].str.replace(regex_pat,' ')
-    
-    #End extra
+        regex_string = "\s+"
+        regex_pat = re.compile(regex_string)
+        data['description'] = data['description'].str.replace(regex_pat,' ')
 
-    #print "Description was", data['description'].as_matrix()
     # Censor words from list of fixed words
     if censor:
-        print "We're censoring"
         if len(CENSORED_WORDS) > 0:
             regex_string = ''
-            #regex_string += r'[^\x00-\x7F]|'
             for w in CENSORED_WORDS:
-                #regex_string+=r'\b' + w + r'*\b|'
-                #regex_string+=r'\b[\S|\X]*' + w + r'[\S|\X]*\b|'
-                #regex_string+=r'\b[\S|\X|\\]*' + w + r'[\S|\X]* ?\b|'
-                #regex_string+=r'\b ?[\S|\X|\\]*' + w + r'[\S|\X]* ?\b|'
+                #regex_string+=r'\b' + w + r'\b|'
                 regex_string+= r'\b[\S]*' + w + r'[\S]*\b|'
-
-            #Hack, trying to figure out how to not have to do this.
-            #regex_string += r'\x9d|'
-
             regex_string = regex_string[0:-1] #remove trailing pipe (|)
-            regex_pat = re.compile(regex_string, flags=(re.IGNORECASE | re.UNICODE))
-            #re.match(regex_pat, data['description'].as_matrix()[0])
-            #result = data['description'].as_matrix()[0].match(regex_pat)
-            #print "RESULT IS", result
-
+            regex_pat = re.compile(regex_string, flags=re.IGNORECASE)
+            
             if processDescriptions == True and processOptions['removeStopWords']==True:
-                #data['description'].as_matrix()[3] = regex_pat.sub(' ', data['description'].as_matrix()[3])# , data['description'].as_matrix()[3])
-                data['description'] = data['description'].str.replace(regex_pat,' ')
+                data['description'] = data['description'].str.replace(regex_pat,'')
             else:
                 data['description'] = data['description'].str.replace(regex_pat,CENSORED_TOKEN)
-
+    
     #Process the descriptions
     if processDescriptions == True:    
         #Remove Contractions
@@ -148,12 +135,10 @@ def importData(path,censor=False,mapVariety=False,filter=False,processDescriptio
             regex_pat = re.compile(REGEX_CONTRACTIONS, flags=re.IGNORECASE)
             data['description'] = data['description'].str.replace(regex_pat,'')
     
-
         #Remove Punctuation
         if processOptions['removePunctuation'] == True:
             regex_pat = re.compile(REGEX_PUNCTUATION)
             data['description'] = data['description'].str.replace(regex_pat,'')
-
 
         #Remove Capitalization
         if processOptions['lowerCase'] == True:
@@ -164,15 +149,15 @@ def importData(path,censor=False,mapVariety=False,filter=False,processDescriptio
             if len(STOP_WORDS) > 0:
                 regex_string = ''
                 for w in STOP_WORDS:
-                    regex_string+= r'\b[\X]*' + w + r'[\X]*\b|'
+                    regex_string+=r'\b' + w + r'\b|'
                 regex_string = regex_string[0:-1] #remove trailing pipe (|)
                 regex_pat = re.compile(regex_string, flags=re.IGNORECASE)
                 data['description'] = data['description'].str.replace(regex_pat,'')
+        
                 #remove extra spaces created by deleting words
                 regex_string = "\s+"
                 regex_pat = re.compile(regex_string)
                 data['description'] = data['description'].str.replace(regex_pat,' ')
-
     
     #Create new columns with wine color and class number
     mapVariety = filter if filter == True else mapVariety #filter overrides mapVariety because we need the color field to filter data
@@ -183,41 +168,46 @@ def importData(path,censor=False,mapVariety=False,filter=False,processDescriptio
     #Filter only on selected varieties
     if filter:
         data = data.loc[data['color'] != 'N/A']
-
+        
     return data
 
 
-#Test Cases:
-if False:
-    df = importData("../wine/winemag-data_first150k.csv")
-    df1 = importData("../wine/winemag-data_first150k.csv",censor=True)
-    df2 = importData("../wine/winemag-data_first150k.csv",censor=True,filter=True)
-    df3 = importData("../wine/winemag-data_first150k.csv",censor=True,filter=True,processDescriptions=True)
+
+##########################################################################################################
+word_stemmer = PorterStemmer()
+
+def trainWord2Vec(min_count=2,size=50,window=4):
+    """
+    Returns a trained word2vec model
+    """
+    #Load descriptions (i.e. word2vec training data)
+    df = importData("data-raw/winemag-data_first150k.csv",removeSpecialChars=True,censor=False,filter=True,processDescriptions=True,
+                    processOptions={'removeContractions':False,'removePunctuation':True,'removeStopWords':True,'lowerCase':True}) 
     
-    df.shape   # m = 150,930 wine reviews overall; 11 columns originally
-    df1.shape  # Same as df1 except censored words have been removed from the description column
-    df2.shape  # Reduced to m = 96,691 wine review; 13 columns overall (+color and class)
-    df3.shape  # Same as df2, except description column has been pre-processed
-    
-    set(df2['color'].values) #set(['White','Red']) as expected
-    set(df3['color'].values) #set(['White','Red']) as expected
-    set(df2['class'].values) #set([0,1,....,23]) as expected
-    set(df3['class'].values) #set([0,1,....,23]) as expected
-    
-    #track evolution of a single review
-    df['description'][14587]  #[77946]
-    df1['description'][14587]  #[77946]
-    df2['description'][14587]  #[77946]
-    df3['description'][14587]  #[77946]
-    
-    #Check Veltline mappings worked
-    x = []
-    vals = set(df2['variety'].values)
-    len(vals)
-    for v in vals:
-        if v.find('Veltliner') != -1:
-            x.append(v)
-    print x
+    #Convert to an iterable of sentences
+    descriptions = df['description'].as_matrix()
+    sentences = [[word_stemmer.stem(w) for w in desc.split()] for desc in descriptions] #must be an iterable of iterables
+
+    #Train model
+    model = Word2Vec(sentences,min_count=min_count, size=size, window=window)
+    return model
+
+def extracWord2VecFeatures(model):
+    """
+    Returns a function that takes as input a string |text| and returns a dense vector (numpy array)
+    that is the featurization of |text| based on the supplied word2vec |model|
+
+    Sums individual word vectors for a given text
+    """
+    def word2vecFeatures(text):
+        result = np.zeros(model.layer1_size)
+        for w in text.split():
+           w_stem = word_stemmer.stem(w)
+           if w_stem in model.wv.vocab.keys():
+                result += model[w_stem]
+        return result
+
+    return word2vecFeatures
 
 
 
@@ -304,24 +294,6 @@ def extractCharFeatures(n,count=True,
     return charFeatures
 
 
-#Test Cases
-if False:
-    extractor1 = extractCharFeatures(3)
-    extractor2 = extractCharFeatures(4,removeStopWords=True)
-    extractor3 = extractCharFeatures(4,removeStopWords=True,lowerCase=True)
-    print extractor1("I like tacos")
-    print extractor1("Land and air")
-    print extractor2("Land and air")
-    print extractor3("Land and air")
-    extractor4 = extractCharFeatures(2)
-    extractor5 = extractCharFeatures(2,removePunctuation=True)
-    extractor6 = extractCharFeatures(2,removePunctuation=True, count=False)
-    extractor7 = extractCharFeatures(2,removePunctuation=True,removeContractions=True)
-    print extractor4("I ain't going, don't go!")
-    print extractor5("I ain't going, don't go!")
-    print extractor6("I ain't going, don't go!")
-    print extractor7("I ain't going, don't go!")
-
 
 
 ##########################################################################################################
@@ -407,31 +379,7 @@ def extractWordFeatures(n, count=True,
         return dict(ngram_counts) #convert back to regular dict type
     
     #Return function
-
     return wordFeatures
-
-
-#Test Cases
-if False:
-    extractor1 = extractWordFeatures(1)
-    extractor2 = extractWordFeatures(1,removeStopWords=True)
-    extractor3 = extractWordFeatures(1,removeStopWords=True,lowerCase=True)
-    print extractor1("I like tacos")
-    print extractor1("Land and air")
-    print extractor2("Land and air")
-    print extractor3("Land and air")
-    extractor4 = extractWordFeatures(2)
-    extractor5 = extractWordFeatures(2,removePunctuation=True)
-    extractor6 = extractWordFeatures(2,removePunctuation=True, count=False)
-    extractor7 = extractWordFeatures(2,removePunctuation=True,removeContractions=True)
-    print extractor4("I ain't going, don't go!")
-    print extractor5("I ain't going, don't go!")
-    print extractor6("I ain't going, don't go!")
-    print extractor7("I ain't going, don't go!")
-    print extractor4("I ate some cheese and ate some steak")
-    print extractor5("I ate some cheese and ate some steak")
-    print extractor6("I ate some cheese and ate some steak")
-    print extractor7("I ate some cheese and ate some steak")
 
 
 
@@ -453,22 +401,10 @@ def featureExtractor(individualExtractors):
         return features
     return extract
 
-#Test Cases
-if False:
-    extractor1 = extractCharFeatures(3)
-    extractor2 = featureExtractor([extractCharFeatures(3)])
-    extractor3 = extractCharFeatures(4)
-    extractor4 = featureExtractor([extractCharFeatures(3),extractCharFeatures(4)])
-    extractor5 = featureExtractor([extractCharFeatures(3),extractWordFeatures(2)])
-    print extractor1("I go shopping")
-    print extractor2("I go shopping") #duplicate extractor1
-    print extractor3("I go shopping")
-    print extractor4("I go shopping") #combines extractor1 and extractor3
-    print extractor5("I go shopping")
 
 
 ##########################################################################################################
-def DesignMatrix(data,dataWV,featurizer,num_train, wordVec = None):
+def DesignMatrix(data_train,data_dev,data_test,featurizer):
     """
     Takes as input a list (or 1-D array) of model input values x^(i) to which to apply a featurizer, phi()
     Produces train/dev sparse matrices which can be used for modelling    
@@ -477,106 +413,58 @@ def DesignMatrix(data,dataWV,featurizer,num_train, wordVec = None):
     @param featurizer: a function that generates a dictionary given an item from data
     @param num_train: number of examples to return in X_train. The rest go in X_dev
     """
-    #for dev
-    #data = data['description'].as_matrix()
-    #featurizer = extractCharFeatures(3)
-    #num_train = 600
-    
-    #----------------------------------------------------------------#
-    # Experimenting with parallel processing - not working yet
-    
-    # This works if featurizer is a top-level function
-    #feature_list = list(Pool().map(featurizer,data))
+    if (featurizer.func_name == 'word2vecFeatures'):
+        wordVectorSize = featurizer('').shape[0]
 
-    # This hack doesn't work
-    #def featurizer_wrapper(x):
-    #    return featurizer(x)    
-    #feature_list = list(Pool().map(featurizer_wrapper,data))
-    #----------------------------------------------------------------#
+        train_feature_mat = np.zeros((data_train.shape[0],wordVectorSize))
+        for i,description in enumerate(data_train):
+            train_feature_mat[i,:] = featurizer(description)
 
-    #WIth wordVec False:
-    #Train Accuracy, Dev Accuracy, Null Accuracy 
-    #0.947771428571 0.6632 0.1924
+        dev_feature_mat = np.zeros((data_dev.shape[0],wordVectorSize))
+        for i,description in enumerate(data_dev):
+            dev_feature_mat[i,:] = featurizer(description)
 
-    wordVec = True
-    feature_list = []
-    print dataWV
-    if wordVec :
-        #sentences = [el.split() for el in dataWV]
-        sentences = [sentence.split() for sentence in dataWV]
-        min_count = 1 #Unclear what this needs to be to encapsulate everything?
-        size = 200 #Gives you dimensionality of vector
-        window = 5
-        model = Word2Vec(sentences, min_count=min_count, size=size, window=window)
-        #feature_list = []
+        test_feature_mat = np.zeros((data_test.shape[0],wordVectorSize))
+        for i,description in enumerate(data_test):
+            test_feature_mat[i,:] = featurizer(description)
 
-        #Want Euclidean distance between all output vectors, and see which examples have minimum
-        #distance to each other, with the whole summation stuff.  So you're not even using 
-        #print "STUFFFFF: ", model.similarity('tremendous', 'tannins')
-        
+        feature_names = []
 
-        for description in data :
-            outputVector = np.zeros(size)
-            descriptionLength = 0
-            for word in description.split() :
-                if word in model.wv.vocab.keys() :
-                    outputVector += model[word]
-                    descriptionLength += 1
-                else :
-                    print "Word: ", word, " not in dictionary"
-                    print "Description is: ", description
-            outputVector *= float(1)/descriptionLength
-            feature_list.append(outputVector)
-            #feature_list.append((ell, np.array(outputVector)))
+        return train_feature_mat,dev_feature_mat,test_feature_mat,feature_names
 
-        train_feature_mat_sparse = sp.csr_matrix(feature_list[:num_train])
-        dev_feature_mat_sparse = sp.csr_matrix(feature_list[num_train:])
-        feature_names = ['blah', 'blah']
-        return train_feature_mat_sparse,dev_feature_mat_sparse,feature_names
-        '''
-        minDistance = float('Inf')
-        lenFeatList = len(feature_list)
-    
-        #Code for nearest neighbor sentences.  Commented out for now
-        
-        for i in range(0, len(feature_list)) :
-            for j in range(i + 1, len(feature_list)) :
-                vec1 = feature_list[i]
-                vec2 = feature_list[j]
-                dist = np.linalg.norm(vec1[1] - vec2[1])
-                if dist > 0 and dist < minDistance : #Don't let it be to itself
-                    print "Min distance is now: {}".format(dist)
-                    print "vec1 is {}".format(vec1[0])
-                    print "vec2 is {}".format(vec2[0])
-                    minDistance = dist
-                    sentence1 = vec1[0]
-                    sentence2 = vec2[0]
-            #feature_list.append(outputVector)
-        
-    
-        print "Min distance was {}".format(minDistance)
-        print "Sentence 1 was {}".format(sentence1)
-        print "Sentence 2 was {}".format(sentence2)
-        '''
-
-    else :
-        feature_list = list(map(featurizer,data))
-        assert num_train > 0 and num_train < len(feature_list)
-
-        vectorizer = DictVectorizer() 
-        train_feature_mat_dense = vectorizer.fit_transform(feature_list[:num_train]).toarray()
-        dev_feature_mat_dense   = vectorizer.transform(feature_list[num_train:]).toarray()
-
-       
+    else:
+        vectorizer = DictVectorizer()
         #doc: -http://scikit-learn.org/stable/modules/generated/sklearn.feature_extraction.DictVectorizer.html-
             #transform(): Named features not encountered during fit or fit_transform will be silently ignored.
 
+        #Training set - encode sparse features
+        feature_list_train = list(map(featurizer,data_train))
+        train_feature_mat_dense = vectorizer.fit_transform(feature_list_train).toarray()
+        del feature_list_train
         train_feature_mat_sparse = sp.csr_matrix(train_feature_mat_dense)
-        dev_feature_mat_sparse   = sp.csr_matrix(dev_feature_mat_dense)
+        del train_feature_mat_dense
 
+        #Dev set - apply sparse features
+        feature_list_dev = list(map(featurizer,data_dev))
+        dev_feature_mat_dense   = vectorizer.transform(feature_list_dev).toarray()
+        del feature_list_dev
+        dev_feature_mat_sparse   = sp.csr_matrix(dev_feature_mat_dense)
+        del dev_feature_mat_dense
+
+        #Test set - apply sparse features
+        feature_list_test = list(map(featurizer,data_test))
+        test_feature_mat_dense   = vectorizer.transform(feature_list_test).toarray()
+        del feature_list_test
+        test_feature_mat_sparse   = sp.csr_matrix(test_feature_mat_dense)
+        del test_feature_mat_dense
+
+        #Get feature name encoddings
         feature_names = list(map(str,vectorizer.get_feature_names()))
-        
-        return train_feature_mat_sparse,dev_feature_mat_sparse,feature_names
+    
+        #Return value
+        return train_feature_mat_sparse,dev_feature_mat_sparse,test_feature_mat_sparse,feature_names
+
+    return None
 
 
 #Used to benchmark speed of custom extractors
@@ -598,6 +486,55 @@ def outputWeights(path,weights_df,featureWidth=10):
     for index, row in weights_df.iterrows():
         print >>fout, row['feature'].rjust(featureWidth) + '\t' + str(row['coef'])
     fout.close()
+
+
+
+##########################################################################################################
+#Confusion Matrix Plot
+def plot_confusion_matrix(cm, classes,
+                          normalize=False,
+                          title='Confusion Matrix',
+                          cmap=plt.cm.Blues,
+                          vals=False,
+                          outname='temp'):
+    """
+    This function prints and plots the confusion matrix.
+    Normalization can be applied by setting `normalize=True`.
+
+    Source: 
+        scikit-learn.org/stable/auto_examples/model_selection/
+        plot_confusion_matrix.html#sphx-glr-auto-examples-model-selection-plot-confusion-matrix-py
+    """
+    if normalize:
+        cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+        #print("Normalized confusion matrix")
+    else:
+        pass
+        #print('Confusion matrix, without normalization')
+
+    #print(cm)
+    plt.figure(figsize=(11,8.5))
+    plt.imshow(cm, interpolation='nearest', cmap=cmap)
+    plt.title(title)
+    plt.colorbar()
+    tick_marks = np.arange(len(classes))
+    plt.xticks(tick_marks, classes, rotation=90)
+    plt.yticks(tick_marks, classes)
+
+    fmt = '.2f' if normalize else 'd'
+    thresh = cm.max() / 2.
+    if vals:
+        np.set_printoptions(precision=2)
+        for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
+            plt.text(j, i, format(cm[i, j], fmt),
+                     horizontalalignment="center",
+                     color="white" if cm[i, j] > thresh else "black")
+
+    plt.tight_layout()
+    plt.ylabel('True Label')
+    plt.xlabel('Predicted Label')
+    plt.savefig('plots/{0}.png'.format(outname))
+
 
 
 ##########################################################################################################
