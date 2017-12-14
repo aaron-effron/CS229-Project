@@ -9,7 +9,7 @@ df = importData("winemag-data_first150k.csv",censor=True,filter=True,processDesc
      #be patient. It takes about 50 seconds
 
 #dfWV = importData("winemag-data_first150k.csv", filter=True, processDescriptions=True, processOptions={'removeContractions':False,'removePunctuation':True,
-
+#dfWV = importData("winemag-data_first150k_test.csv",censor=True,filter=True,processDescriptions=True) 
 dfWV = importData("winemag-data_first150k.csv", filter=True, processDescriptions=True, processOptions={'removeContractions':False,'removePunctuation':True,
                                             'removeStopWords':False, 'lowerCase':True}) 
 

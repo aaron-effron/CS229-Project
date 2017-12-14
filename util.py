@@ -100,13 +100,16 @@ def importData(path,censor=False,mapVariety=False,filter=False,processDescriptio
                             if row['variety'].find('Veltliner')>=0 else row['variety'], axis=1)
     
      #Extra, may not help (to remove all unicode)
-    regex_string = r'[\x9d-\xff]'
+    
+    regex_string = r'[\x89-\xff]'
+    #regex_string = r'[\x9d-\xff]'
     regex_pat = re.compile(regex_string)
     data['description'] = data['description'].str.replace(regex_pat,' ')
 
     regex_string = "\s+"
     regex_pat = re.compile(regex_string)
     data['description'] = data['description'].str.replace(regex_pat,' ')
+    
     #End extra
 
     #print "Description was", data['description'].as_matrix()
@@ -139,7 +142,6 @@ def importData(path,censor=False,mapVariety=False,filter=False,processDescriptio
                 data['description'] = data['description'].str.replace(regex_pat,CENSORED_TOKEN)
 
     #Process the descriptions
-    #print "Description after censor", data['description'].as_matrix()[0]
     if processDescriptions == True:    
         #Remove Contractions
         if processOptions['removeContractions'] == True:
@@ -492,10 +494,16 @@ def DesignMatrix(data,dataWV,featurizer,num_train, wordVec = None):
     #feature_list = list(Pool().map(featurizer_wrapper,data))
     #----------------------------------------------------------------#
 
+    #WIth wordVec False:
+    #Train Accuracy, Dev Accuracy, Null Accuracy 
+    #0.947771428571 0.6632 0.1924
+
     wordVec = True
     feature_list = []
+    print dataWV
     if wordVec :
-        sentences = [el.split() for el in dataWV]
+        #sentences = [el.split() for el in dataWV]
+        sentences = [sentence.split() for sentence in dataWV]
         min_count = 1 #Unclear what this needs to be to encapsulate everything?
         size = 200 #Gives you dimensionality of vector
         window = 5
@@ -506,19 +514,31 @@ def DesignMatrix(data,dataWV,featurizer,num_train, wordVec = None):
         #distance to each other, with the whole summation stuff.  So you're not even using 
         #print "STUFFFFF: ", model.similarity('tremendous', 'tannins')
         
-        for ell in data :
-            outputVector = [0 for i in range(0, size)]
-            for word in ell.split() :
+
+        for description in data :
+            outputVector = np.zeros(size)
+            descriptionLength = 0
+            for word in description.split() :
                 if word in model.wv.vocab.keys() :
-                    outputVector = [x + y for x, y in zip(outputVector, model[word])]
+                    outputVector += model[word]
+                    descriptionLength += 1
                 else :
                     print "Word: ", word, " not in dictionary"
-                    print "Sentence is: ", ell
-            feature_list.append((ell, np.array(outputVector)))
+                    print "Description is: ", description
+            outputVector *= float(1)/descriptionLength
+            feature_list.append(outputVector)
+            #feature_list.append((ell, np.array(outputVector)))
 
+        train_feature_mat_sparse = sp.csr_matrix(feature_list[:num_train])
+        dev_feature_mat_sparse = sp.csr_matrix(feature_list[num_train:])
+        feature_names = ['blah', 'blah']
+        return train_feature_mat_sparse,dev_feature_mat_sparse,feature_names
+        '''
         minDistance = float('Inf')
         lenFeatList = len(feature_list)
-
+    
+        #Code for nearest neighbor sentences.  Commented out for now
+        
         for i in range(0, len(feature_list)) :
             for j in range(i + 1, len(feature_list)) :
                 vec1 = feature_list[i]
@@ -532,37 +552,31 @@ def DesignMatrix(data,dataWV,featurizer,num_train, wordVec = None):
                     sentence1 = vec1[0]
                     sentence2 = vec2[0]
             #feature_list.append(outputVector)
+        
     
-    print "Min distance was {}".format(minDistance)
-    print "Sentence 1 was {}".format(sentence1)
-    print "Sentence 2 was {}".format(sentence2)
+        print "Min distance was {}".format(minDistance)
+        print "Sentence 1 was {}".format(sentence1)
+        print "Sentence 2 was {}".format(sentence2)
+        '''
 
+    else :
+        feature_list = list(map(featurizer,data))
+        assert num_train > 0 and num_train < len(feature_list)
 
-    #feature_list = list(map(featurizer,data))
-    train_feature_mat_sparse = sp.csr_matrix(feature_list[:num_train])
-    dev_feature_mat_sparse = sp.csr_matrix(feature_list[num_train:])
-    feature_names = ['blah', 'blah']
+        vectorizer = DictVectorizer() 
+        train_feature_mat_dense = vectorizer.fit_transform(feature_list[:num_train]).toarray()
+        dev_feature_mat_dense   = vectorizer.transform(feature_list[num_train:]).toarray()
 
-    #print feature_list[0]
-    #print "Feature list: ", feature_list
-    assert num_train > 0 and num_train < len(feature_list)
+       
+        #doc: -http://scikit-learn.org/stable/modules/generated/sklearn.feature_extraction.DictVectorizer.html-
+            #transform(): Named features not encountered during fit or fit_transform will be silently ignored.
 
-    vectorizer = DictVectorizer() 
-    #train_feature_mat_dense = vectorizer.fit_transform(feature_list[:num_train]).toarray()
-    #dev_feature_mat_dense   = vectorizer.transform(feature_list[num_train:]).toarray()
+        train_feature_mat_sparse = sp.csr_matrix(train_feature_mat_dense)
+        dev_feature_mat_sparse   = sp.csr_matrix(dev_feature_mat_dense)
 
-    #print train_feature_mat_dense[0]
-    #print "Train feature matrix dense is: ", train_feature_mat_dense
-
-    #doc: -http://scikit-learn.org/stable/modules/generated/sklearn.feature_extraction.DictVectorizer.html-
-        #transform(): Named features not encountered during fit or fit_transform will be silently ignored.
-
-    #train_feature_mat_sparse = sp.csr_matrix(train_feature_mat_dense)
-    #dev_feature_mat_sparse   = sp.csr_matrix(dev_feature_mat_dense)
-
-    #feature_names = list(map(str,vectorizer.get_feature_names()))
-    
-    return train_feature_mat_sparse,dev_feature_mat_sparse,feature_names
+        feature_names = list(map(str,vectorizer.get_feature_names()))
+        
+        return train_feature_mat_sparse,dev_feature_mat_sparse,feature_names
 
 
 #Used to benchmark speed of custom extractors
