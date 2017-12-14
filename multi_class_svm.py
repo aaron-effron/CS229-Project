@@ -126,10 +126,10 @@ Dev Score with sklearn and libsvm: 0.976800
 y_train_bin = (1*(data['color'][:num_train] == 'Red')).as_matrix()
 y_dev_bin   = (1*(data['color'][num_train:] == 'Red')).as_matrix()
 
-libsvm = LinearSVC(multi_class='crammer_singer', C=.1)
-libsvm.fit(X_train_bias, y_train_bin)
+libsvm = LinearSVC(multi_class='ovr', C=0.01)
+libsvm.fit(X_train_bias, y_train)
 print("Train Score with sklearn and libsvm: %f"
-      % (libsvm.score(X_train_bias, y_train_bin)))
+      % (libsvm.score(X_train_bias, y_train)))
 print("Dev Score with sklearn and libsvm: %f"
-      % (libsvm.score(X_dev_bias, y_dev_bin)))
+      % (libsvm.score(X_dev_bias, y_dev)))
 
