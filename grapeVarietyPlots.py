@@ -9,7 +9,7 @@ import operator
 import numpy as np
 import math
 import sys  
-import tfidf_rev
+import tfidf
 from matplotlib import rcParams
 
 def importData(path):
@@ -17,7 +17,7 @@ def importData(path):
     try :
         data = pd.read_csv(path, encoding = 'utf8')
     except UnicodeDecodeError as e :
-        print "UGH!", e
+        print "Unicode Error"
     
     return data
     
@@ -32,10 +32,7 @@ def getGrapeVarietyDict(df, excludeSmall = False) :
     grapeVarietyDict = defaultdict(list)
     for index, row in df.iterrows(): 
         grapeVariety = row['variety']
-        '''
-        if 'Blend' in grapeVariety.split() :
-            continue
-        '''
+
         if grapeVariety not in grapeVarietyDict :
             grapeVarietyDict[grapeVariety].append(0)
         grapeVarietyDict[grapeVariety][0] += 1
@@ -174,7 +171,6 @@ def plotPriceBarChart(grapeVarietyPriceDict, standardDevDict) :
     prices.plot(kind='bar', yerr=errors, ax=ax, error_kw=dict(ecolor='black',elinewidth=0.5), grid=False, rot = 90)
     ax.set_xticklabels(df.A)
 
-    #df.set_index('A').plot(kind='bar', yerr=errors, error_kw=dict(ecolor='black',elinewidth=0.5), grid=False, rot = 90, figsize=(30, 20))
     plt.savefig('PriceBarChart.png')
 
 def main() :
@@ -184,7 +180,6 @@ def main() :
     for arg in sys.argv :
         if arg == 'v' :
             grapeVarietyDict = getGrapeVarietyDict(df, True)
-            #grapeVarietyByCountryDict = getGrapeVarietyByCountryDict(df, grapeVarietyDict, True)
             plotBarChart(grapeVarietyDict)
             #plotStackedBarChart(grapeVarietyByCountryDict)
         elif arg == 'p' :
@@ -202,7 +197,7 @@ def main() :
                 for keya in key.split() : #break up multiple word names
                     keyList.append(keya.lower())
                 documentList.append(descriptionDict[key][0])
-            tfidf_rev.extractTDIFWordFeatureAll(documentList, keyList, 3)
+            tfidf.extractTFIDFWordFeatureAll(documentList, keyList, 3)
            
 if __name__ == '__main__':
     main()

@@ -1,64 +1,46 @@
-#test.py
+#tfidf.py.  TF-IDF analysis of wine descriptions.
+#Base code borrowed from http://stevenloria.com/finding-important-words-in-a-document-using-tf-idf/
 from __future__ import division, unicode_literals
 import math
 from textblob import TextBlob as tb
+from collections import defaultdict
 
+def tf(word, dicta):
+    return float(dicta[word]) / sum(dicta.values())
 
-def tf(word, blob):
-    return blob.words.count(word) / len(blob.words)
+def n_containing(word, dictList):
+    return sum(1 for dicta in dictList if dicta[word] > 0)
 
-def n_containing(word, bloblist):
-    return sum(1 for blob in bloblist if word in blob.words)
+def idf(word, dictList):
+    return math.log(len(dictList) / (1 + n_containing(word, dictList)))
 
-def idf(word, bloblist):
-    return math.log(len(bloblist) / (1 + n_containing(word, bloblist)))
+def tfidf(word, dicta, dictList):
+    return tf(word, dicta) * idf(word, dictList)
 
-def tfidf(word, blob, bloblist):
-    return tf(word, blob) * idf(word, bloblist)
+#Use dictionaries for tfidf
+def makeDictListAll(documentList, keyList) :
+    dictList = []
+    for i in range(0, len(documentList)) :
+        document = documentList[i]
+        documentDict = defaultdict(float)
+        for word in document.split() :
+            add = True
+            for key in keyList :
+                if key in word.lower() :
+                    add = False
+                    break
+            if (add) :
+                documentDict[word.lower()] += 1
 
-#Fancy
-def makeBlobList(document, refDocumentList) :
-    bloblist = [tb(document)]
-    for document in refDocumentList :
-        bloblist.append(tb(document))
-    return bloblist
-
-def makeBlobListAll(documentList) :
-    bloblist = []
-    for document in documentList :
-        bloblist.append(tb(document))
-    return bloblist
-
-def extractTDIFWordFeatures(document, refDocumentList, k = None) :
-    bloblist = makeBlobList(document, refDocumentList)
-    docLength = len(document.split())
-    if k == None or k > docLength or k < 1 :
-        k = docLength 
-    print("Top words in document: ")
-    blob = bloblist[0] #Document
-    scores = {word: tfidf(word, blob, bloblist) for word in blob.words}
-    sorted_words = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-    for word, score in sorted_words[:k]:
-        print("\tWord: {}, TF-IDF: {}".format(word, round(score, k)))
+        dictList.append(documentDict)
+    return dictList
         
-def extractTDIFWordFeatureAll(documentList, k) :
-    bloblist = makeBlobListAll(documentList)
-    for i, blob in enumerate(bloblist):
-        print("Top words in document {}".format(i + 1))
-        scores = {word: tfidf(word, blob, bloblist) for word in blob.words}
+def extractTFIDFWordFeatureAll(documentList, keyList, k) :
+    dictList = makeDictListAll(documentList, keyList)
+    for i, dicta in enumerate(dictList):
+        print("Top words in document {} which has key {}".format(i + 1, keyList[i]))
+        scores = {word: tfidf(word, dicta, dictList) for word in dicta.keys()}
         sorted_words = sorted(scores.items(), key=lambda x: x[1], reverse=True)
         for word, score in sorted_words[:k]:
             print("\tWord: {}, TF-IDF: {}".format(word, round(score, k)))
    
-document1 = """welcome to stay in private room with queen bed and detached private bathroom on the second floor."""
-
-document2 = """stylish, fully remodeled home in upscale NW Alamo Heights Area."""
-
-document3 = """private room (shared bathroom) in a warm family home. it's perfect for business trips, vacation and extended stays."""
-
-def main():
-    documentList = [document1, document2, document3]
-    extractTDIFWordFeatureAll(documentList, 3)
-
-if __name__ == '__main__':
-    main()

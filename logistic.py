@@ -15,7 +15,6 @@ featurizer   = extractWordFeatures(1)
   #               extracWord2VecFeatures(trainWord2Vec(min_count=2,size=400,window=4))
 balanceDataset = True
 
-
 # Import Data
 #------------------------------------------------------------------------------------------------------
 data_test = pd.read_csv('data-processed/data.test')
