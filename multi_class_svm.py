@@ -12,6 +12,7 @@ from util import *
 from sklearn.datasets import load_digits
 from sklearn.model_selection import train_test_split
 from sklearn.svm import LinearSVC
+from scipy.sparse import hstack
 
 # Settings
 #------------------------------------------------------------------------------------------------------
@@ -33,16 +34,16 @@ X_train,X_dev,X_test,feature_names = DesignMatrix(data_train=data_train['descrip
                                                    data_test=data_test['description'].as_matrix(),
                                                    featurizer=featurizer)
 print(time.time() - start)
-
 # we add a constant 1 feature for the bias
 
 devBias = np.ones((X_dev.shape[0], 1))
 testBias = np.ones((X_test.shape[0], 1))
 
 trainBias = np.ones((X_train.shape[0], 1))
-X_train_bias = np.hstack((trainBias, X_train.todense()))
-X_dev_bias = np.hstack((devBias, X_dev.todense()))
-X_test_bias = np.hstack((testBias, X_test.todense()))
+
+X_train_bias = hstack((X_train, trainBias))
+X_dev_bias = hstack((X_dev, devBias))
+X_test_bias = hstack((X_test, testBias))
 
 if task == 1:
     labels = ['White','Red']
