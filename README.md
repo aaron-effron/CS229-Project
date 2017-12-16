@@ -3,7 +3,6 @@ Wine Project!
 
 Files:
 - EDA.py: Exploratory data analysis, generating various plots
-- PCA.py: Perform principal component analysis on a certain feature set
 - decisionTree.py: Decision tree and random forest models
 - grapeVarietyPlots.py: Also part of exploratory data analysis to generate various plots
 - kMeansClustering.py: K-Means Clustering for wine recommendations
