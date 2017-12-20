@@ -1,4 +1,4 @@
-# CS229-Project
+# CS229-Project: Learning the Language of Wine
 
 Wine has been an integral element of human society for millennia. Accounts of wine date as far back as Egyptian and Roman times and wine often has symbolic significance for certain religions. In modern times, wine is often the beverage of choice for social gatherings and celebrations.
 
